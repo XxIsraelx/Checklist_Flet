@@ -1,7 +1,22 @@
 import flet as ft
-from flet import Text, MainAxisAlignment, CrossAxisAlignment, FontWeight, TextField
+from flet import Text, MainAxisAlignment, CrossAxisAlignment, FontWeight, TextField, AlertDialog, Dropdown
 import time
 import locale
+
+# Lista de motoristas e placas de caminhões (pode ser alterado conforme necessário)
+motoristas = [
+            "Anderson Alves", "André", "Danisete", "Erick", "Fernando", 
+            "Gilmar", "Igor", "Israel", "Joao Victor", "Jilson", "Marco Antonio", 
+            "Manoel", "Mario", "Nilton", "Reginaldo", "Washigton", "Vitor Hugo", 
+            "Josue", "Juliano", "Oseias", "Valdinei"
+            ]
+
+placas = [
+        "2E21", "8H52", "3833", "0048", "2645", "1270",
+        "1079", "6D17", "7J38", "7246", "9004", "1528",
+        "9C47", "0D86", "9543", "8847", "6179", "8G63",
+        "6062", "2H13", "9701", "3125", "9H71", "3J16" 
+        ]
 
 def main(page: ft.Page):
     page.title = "Checklist"
@@ -19,14 +34,14 @@ def main(page: ft.Page):
         {"name": "Nivel do Óleo", "checked": False, "comment": ""},
         {"name": "Reservatorio de Agua", "checked": False, "comment": ""},
         {"name": "Teste de Freios:", "checked": False, "comment": ""},
-        {"name": "Lanternas e Iluminação:", "checked": False, "comment": ""},
-        {"name": "Bateria:", "checked": False, "comment": ""},
-        {"name": "Lataria/visual:", "checked": False, "comment": ""},
-        {"name": "Vazamentos:", "checked": False, "comment": ""},
-        {"name": "Tacógrafo:", "checked": False, "comment": ""},
+        {"name": "Lanternas e Iluminação:", "checked": False, "comment": ""}, 
+        {"name": "Bateria:", "checked": False, "comment": ""}, 
+        {"name": "Lataria/visual:", "checked": False, "comment": ""}, 
+        {"name": "Vazamentos:", "checked": False, "comment": ""}, 
+        {"name": "Tacógrafo:", "checked": False, "comment": ""}, 
         {"name": "Thermo King:", "checked": False, "comment": ""}, 
-        {"name": "Condição do baú:", "checked": False, "comment": ""},
-        {"name": "Ferramentas:", "checked": False, "comment": ""},
+        {"name": "Condição do baú:", "checked": False, "comment": ""}, 
+        {"name": "Ferramentas:", "checked": False, "comment": ""}, 
     ]
 
     def create_checklist():
@@ -104,10 +119,98 @@ def main(page: ft.Page):
 
     submit_button = ft.ElevatedButton(
         text="Enviar", 
-        on_click=lambda e: page.add(ft.Text("Formulário Enviado!")), 
+        on_click=lambda e: show_confirm_pop_up(),  # Abre o pop-up de confirmação ao clicar
         disabled=True,  # Desabilitado inicialmente
         tooltip="Os campos KM atual e KM da próxima troca de óleo são obrigatórios."
     )
+
+    cancel_button = ft.ElevatedButton(
+        text="Cancelar", 
+        on_click=lambda e: show_cancel_confirmation_dialog(),
+    )
+
+    # Função para exibir o pop-up de confirmação de cancelamento
+    def show_cancel_confirmation_dialog():
+        dialog = AlertDialog(
+            title=Text("Deseja cancelar o envio do formulário?"),
+            content=Text("Você tem certeza que deseja cancelar?"),
+            actions=[
+                ft.TextButton(text="Sim", on_click=lambda e: cancel_form(dialog)),  # Cancela e fecha o app
+                ft.TextButton(text="Não", on_click=lambda e: close_dialog(dialog)),  # Fecha o pop sem cancelar
+            ]
+        )
+        page.add(dialog)
+        dialog.open = True
+        page.update()
+
+    def cancel_form(dialog):
+        # Fecha a aplicação se o usuário clicar "Sim"
+        dialog.open = False
+        page.update()
+        page.window.destroy()
+
+    def close_dialog(dialog):
+        # Apenas fecha o pop-up
+        dialog.open = False
+        page.update()
+
+    # Função para exibir o pop-up de confirmação de envio
+    def show_confirm_pop_up():
+        # Exclui a mensagem "Formulário Enviado!"
+        for control in page.controls:
+            if isinstance(control, ft.Text) and control.value == "Formulário Enviado!":
+                page.controls.remove(control)
+
+        # Criação do pop-up com altura ajustada
+        dialog = AlertDialog(
+            title=ft.Row(
+                controls=[ft.Text("Confirmar envio", size=18, weight=FontWeight.BOLD)],  # Coloca o título dentro de uma Row
+                alignment=ft.MainAxisAlignment.CENTER,  # Alinha o título no centro
+            ),
+            content=ft.Column(
+                controls=[
+                    ft.Text("Escolha o motorista:", size=15),
+                    ft.Dropdown(
+                        options=[ft.dropdown.Option(motorista) for motorista in motoristas],
+                        width=250,
+                        value=None,
+                        label="Motorista",
+                        height=40,  # Ajusta a altura do dropdown
+                    ),
+                    ft.Text("Escolha a placa do caminhão:", size=15),
+                    ft.Dropdown(
+                        options=[ft.dropdown.Option(placa) for placa in placas],
+                        width=250,
+                        value=None,
+                        label="Placa do caminhão",
+                        height=40,  # Ajusta a altura do dropdown
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=5  # Ajusta o espaçamento entre os controles
+            ),
+            actions=[
+                ft.TextButton(text="Enviar", on_click=lambda e: send_form(dialog)),
+                ft.TextButton(text="Cancelar", on_click=lambda e: close_dialog(dialog)),
+            ],
+        )
+    
+        # Ajuste o tamanho da coluna de conteúdo diretamente para controlar a altura
+        dialog.content.height = 200  # Limitando a altura do conteúdo
+    
+        page.add(dialog)
+        dialog.open = True
+        page.update()
+
+    def send_form(dialog):
+        # Aqui você pode adicionar a lógica de envio do formulário (salvar ou enviar os dados)
+        page.add(ft.Text("Formulário Enviado!"))
+        close_dialog(dialog)  # Fecha o pop-up após o envio
+
+    def close_dialog(dialog):
+        # Apenas fecha o pop-up
+        dialog.open = False
+        page.update()
 
     # Adicionando data e hora no canto superior direito
     def update_time(e=None):
@@ -128,14 +231,51 @@ def main(page: ft.Page):
         km_atual_value = km_current_field.value
         km_proxima_value = km_next_field.value
 
+        # Verifica se algum dos campos de KM está vazio
         if km_atual_value == "" or km_proxima_value == "":
-            submit_button.disabled = True  # Botão desabilitado
+            submit_button.disabled = True  # Desabilita o botão de envio
             submit_button.tooltip = "Os campos KM atual e KM da próxima troca de óleo são obrigatórios."
             page.update()
-        else:
-            submit_button.disabled = False  # Botão habilitado
-            submit_button.tooltip = ""  # Limpa o tooltip quando os campos são preenchidos
+            return  # Não prossegue com a validação se algum campo estiver vazio
+
+        try:
+            # Tenta converter os valores para float (considerando números decimais também)
+            km_atual_value = float(km_atual_value)
+            km_proxima_value = float(km_proxima_value)
+
+            # Verifica se o KM da próxima troca é maior que o KM atual
+            if km_proxima_value <= km_atual_value:
+                return  # Não prossegue com o envio se houver erro
+
+            # Se passou nas validações, habilita o botão de envio
+            submit_button.disabled = False
+            submit_button.tooltip = ""  # Limpa o tooltip de erro
             page.update()
+        
+        except ValueError:
+            # Se algum valor não for convertido corretamente (por exemplo, letras em vez de números)
+            show_alert("Valor informado inválido", "Por favor, insira números válidos para os campos KM.")
+            submit_button.disabled = True  # Desabilita o botão de envio em caso de erro
+            submit_button.tooltip = "Os campos KM devem ser numéricos."
+            page.update()
+
+    def show_alert(title, message):
+        # Função para exibir o pop-up de erro
+        dialog = AlertDialog(
+            title=Text(title),
+            content=Text(message),
+            actions=[
+                ft.TextButton(text="OK", on_click=lambda e: close_alert(dialog))  # Usando a função close_alert
+            ]
+        )
+        page.add(dialog)
+        dialog.open = True
+        page.update()
+
+    def close_alert(dialog):
+        # Função para fechar o alerta
+        dialog.open = False
+        page.update()  # Atualiza a página para refletir a mudança
 
     # Layout da página
     page.add(
@@ -149,7 +289,7 @@ def main(page: ft.Page):
                 *create_checklist(),
                 ft.Text("Informe os KM para acompanhamento", size=15, weight=FontWeight.BOLD),
                 km_row,  # Linha com os campos KM
-                submit_button,  # Botão de envio
+                ft.Row(controls=[submit_button, cancel_button], spacing=10),  # Botões lado a lado
             ],
             alignment=MainAxisAlignment.CENTER, horizontal_alignment=CrossAxisAlignment.CENTER,
         )
