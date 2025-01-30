@@ -1,85 +1,112 @@
 import flet as ft
-from flet import Text, MainAxisAlignment, CrossAxisAlignment, FontWeight, TextField, AlertDialog, Dropdown
+import gspread
+import json
+from oauth2client.service_account import ServiceAccountCredentials
 import time
 import locale
+from flet import *
+
+# Configuração do Google Sheets
+SHEET_ID = "1i-rMVsXIvx8Dr6q6X1hsXTRWxFpYHUeWwB98p9oFdYI"
+CREDENTIALS_FILE = "silent-region-449314-v3-0e57587ecbd3.json"
+
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+client = gspread.authorize(creds)
+sheet = client.open_by_key(SHEET_ID).sheet1  # Abre a primeira aba da planilha
+
+# Antes de enviar dados, adiciona os cabeçalhos (apenas uma vez)
+def add_headers():
+    headers = [
+        "Data/Hora", "Motorista", "Placa", "KM Atual", "KM Próxima Troca",
+        "Estado do Pneu", "Comentário do Pneu", "Nível do Óleo", "Comentário do Óleo",
+        "Reservatório de Água", "Comentário do Reservatório",
+        "Teste de Freios", "Comentário do Teste de Freios",
+        "Lanternas e Iluminação", "Comentário das Lanternas",
+        "Bateria", "Comentário da Bateria",
+        "Lataria/Visual", "Comentário da Lataria",
+        "Vazamentos", "Comentário dos Vazamentos",
+        "Tacógrafo", "Comentário do Tacógrafo",
+        "Thermo King", "Comentário do Thermo King",
+        "Condição do Baú", "Comentário da Condição do Baú",
+        "Ferramentas", "Comentário das Ferramentas"
+    ]
+    
+    # Verifique se os cabeçalhos já existem para não adicionar novamente
+    if sheet.row_count == 0:
+        sheet.append_row(headers)
+
+add_headers()
 
 # Lista de motoristas e placas de caminhões (pode ser alterado conforme necessário)
 motoristas = [
-            "Anderson Alves", "André", "Danisete", "Erick", "Fernando", 
-            "Gilmar", "Igor", "Israel", "Joao Victor", "Jilson", "Marco Antonio", 
-            "Manoel", "Mario", "Nilton", "Reginaldo", "Washigton", "Vitor Hugo", 
-            "Josue", "Juliano", "Oseias", "Valdinei"
-            ]
+    "Anderson Alves", "André", "Danisete", "Erick", "Fernando", 
+    "Gilmar", "Igor", "Israel", "Joao Victor", "Jilson", "Marco Antonio", 
+    "Manoel", "Mario", "Nilton", "Reginaldo", "Washigton", "Vitor Hugo", 
+    "Josue", "Juliano", "Oseias", "Valdinei"
+]
 
 placas = [
-        "2E21", "8H52", "3833", "0048", "2645", "1270",
-        "1079", "6D17", "7J38", "7246", "9004", "1528",
-        "9C47", "0D86", "9543", "8847", "6179", "8G63",
-        "6062", "2H13", "9701", "3125", "9H71", "3J16" 
-        ]
+    "2E21", "8H52", "3833", "0048", "2645", "1270",
+    "1079", "6D17", "7J38", "7246", "9004", "1528",
+    "9C47", "0D86", "9543", "8847", "6179", "8G63",
+    "6062", "2H13", "9701", "3125", "9H71", "3J16" 
+]
 
 def main(page: ft.Page):
     page.title = "Checklist"
     page.vertical_alignment = ft.MainAxisAlignment.START
+    page.scroll = "adaptive"
 
-    # Ajuste do locale para pt_BR, para garantir que as datas sejam formatadas corretamente
     try:
-        locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')  # Configura para pt_BR
+        locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
     except locale.Error:
-        locale.setlocale(locale.LC_TIME, 'portuguese')  # Caso o anterior falhe, tenta uma alternativa
+        locale.setlocale(locale.LC_TIME, 'portuguese')
 
-    # Lista de itens com o estado de seleção e campo de texto
     items = [
         {"name": "Estado do Pneu", "checked": False, "comment": ""},
-        {"name": "Nivel do Óleo", "checked": False, "comment": ""},
-        {"name": "Reservatorio de Agua", "checked": False, "comment": ""},
-        {"name": "Teste de Freios:", "checked": False, "comment": ""},
-        {"name": "Lanternas e Iluminação:", "checked": False, "comment": ""}, 
-        {"name": "Bateria:", "checked": False, "comment": ""}, 
-        {"name": "Lataria/visual:", "checked": False, "comment": ""}, 
-        {"name": "Vazamentos:", "checked": False, "comment": ""}, 
-        {"name": "Tacógrafo:", "checked": False, "comment": ""}, 
-        {"name": "Thermo King:", "checked": False, "comment": ""}, 
-        {"name": "Condição do baú:", "checked": False, "comment": ""}, 
-        {"name": "Ferramentas:", "checked": False, "comment": ""}, 
+        {"name": "Nível do Óleo", "checked": False, "comment": ""},
+        {"name": "Reservatório de Água", "checked": False, "comment": ""},
+        {"name": "Teste de Freios", "checked": False, "comment": ""},
+        {"name": "Lanternas e Iluminação", "checked": False, "comment": ""},
+        {"name": "Bateria", "checked": False, "comment": ""},
+        {"name": "Lataria/Visual", "checked": False, "comment": ""},
+        {"name": "Vazamentos", "checked": False, "comment": ""},
+        {"name": "Tacógrafo", "checked": False, "comment": ""},
+        {"name": "Thermo King", "checked": False, "comment": ""},
+        {"name": "Condição do Baú", "checked": False, "comment": ""},
+        {"name": "Ferramentas", "checked": False, "comment": ""},
     ]
 
     def create_checklist():
         checklist_controls = []
         for item in items:
-            # Caixa de seleção
             checkbox = ft.Checkbox(label=item["name"], value=item["checked"])
             checkbox.on_change = lambda e, idx=item["name"]: toggle_item(idx, e.control.value)
-
-            # Campo de texto para comentário que aparece se o item for marcado
+            
             comment_input = ft.TextField(
                 label="O que aconteceu?", 
-                visible=item["checked"],  # Inicialmente escondido
+                visible=item["checked"], 
                 width=250,
-                border_color="#696969",  # Cor da borda configurada
+                border_color="#696969",
                 border_radius=10
             )
-            item["comment_input"] = comment_input  # Guardar o campo de comentário na lista de itens
-
-            # Adiciona a caixa de seleção e o campo de texto em um container
+            item["comment_input"] = comment_input
+            
             checklist_controls.append(
-                ft.Row(
+                ft.Column(
                     controls=[checkbox, comment_input],
-                    alignment=MainAxisAlignment.START,
-                    spacing=10
+                    spacing=5
                 )
             )
         return checklist_controls
-    
+
     def toggle_item(item_name, checked):
-        # Atualiza o estado de "checked" e a visibilidade do campo de texto
         for item in items:
             if item["name"] == item_name:
                 item["checked"] = checked
-                # Torna o campo de texto visível quando o item for marcado
                 item["comment_input"].visible = checked
-                item["comment_input"].value = ""  # Limpa o valor ao desmarcar (se necessário)
-        
+                item["comment_input"].value = "" 
         page.update()  # Atualiza a página para refletir as mudanças
 
     # Campos KM atual e KM da próxima troca de óleo
@@ -156,61 +183,118 @@ def main(page: ft.Page):
 
     # Função para exibir o pop-up de confirmação de envio
     def show_confirm_pop_up():
-        # Exclui a mensagem "Formulário Enviado!"
-        for control in page.controls:
-            if isinstance(control, ft.Text) and control.value == "Formulário Enviado!":
-                page.controls.remove(control)
+        global motorista_dropdown, placa_dropdown
 
-        # Criação do pop-up com altura ajustada
+        motorista_dropdown = ft.Dropdown(
+            options=[ft.dropdown.Option(m) for m in motoristas],
+            width=250,
+            value=None,
+            label="Motorista"
+        )
+
+        placa_dropdown = ft.Dropdown(
+            options=[ft.dropdown.Option(p) for p in placas],
+            width=250,
+            value=None,
+            label="Placa do caminhão"
+        )
+
         dialog = AlertDialog(
-            title=ft.Row(
-                controls=[ft.Text("Confirmar envio", size=18, weight=FontWeight.BOLD)],  # Coloca o título dentro de uma Row
-                alignment=ft.MainAxisAlignment.CENTER,  # Alinha o título no centro
-            ),
+            title=ft.Text("Confirmar envio", size=18, weight=FontWeight.BOLD),
             content=ft.Column(
                 controls=[
                     ft.Text("Escolha o motorista:", size=15),
-                    ft.Dropdown(
-                        options=[ft.dropdown.Option(motorista) for motorista in motoristas],
-                        width=250,
-                        value=None,
-                        label="Motorista",
-                        height=40,  # Ajusta a altura do dropdown
-                    ),
+                    motorista_dropdown,
                     ft.Text("Escolha a placa do caminhão:", size=15),
-                    ft.Dropdown(
-                        options=[ft.dropdown.Option(placa) for placa in placas],
-                        width=250,
-                        value=None,
-                        label="Placa do caminhão",
-                        height=40,  # Ajusta a altura do dropdown
-                    ),
+                    placa_dropdown,
                 ],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=5  # Ajusta o espaçamento entre os controles
+                spacing=10
             ),
             actions=[
                 ft.TextButton(text="Enviar", on_click=lambda e: send_form(dialog)),
                 ft.TextButton(text="Cancelar", on_click=lambda e: close_dialog(dialog)),
             ],
         )
-    
-        # Ajuste o tamanho da coluna de conteúdo diretamente para controlar a altura
-        dialog.content.height = 200  # Limitando a altura do conteúdo
-    
+
         page.add(dialog)
         dialog.open = True
         page.update()
 
+
     def send_form(dialog):
-        # Aqui você pode adicionar a lógica de envio do formulário (salvar ou enviar os dados)
+        # Obtenha os dados do formulário
+        motorista = motorista_dropdown.value  # Motorista selecionado (valor real)
+        placa = placa_dropdown.value  # Placa selecionada (valor real)
+        km_atual = km_current_field.value
+        km_proxima = km_next_field.value
+    
+        # Prepara a linha com os dados a serem adicionados
+        data_hora = time.strftime("%d/%m/%Y %H:%M")  # Data e hora atual
+    
+        # Lista para armazenar os feedbacks dos itens
+        item_data = []
+    
+        # Verifica os itens do checklist e define os valores conforme solicitado
+        for item in items:
+            if item["checked"]:  # Se o item foi marcado
+                comment = item["comment_input"].value.strip()
+                if comment == "":  # Se o usuário não escreveu nada
+                    item_data.append("NÃO OK")
+                else:
+                    item_data.append(comment)  # Envia o que o usuário escreveu
+            else:
+                item_data.append("OK")  # Se o item não foi marcado, envia "OK"
+    
+        # A linha com os dados que será enviada para a planilha
+        row = [
+            data_hora, motorista, placa, km_atual, km_proxima,
+            *item_data  # Adiciona os feedbacks dos itens
+        ]
+    
+        # Adiciona a nova linha à planilha
+        sheet.append_row(row)
+
+        # Feedback para o usuário
         page.add(ft.Text("Formulário Enviado!"))
         close_dialog(dialog)  # Fecha o pop-up após o envio
+
+
 
     def close_dialog(dialog):
         # Apenas fecha o pop-up
         dialog.open = False
         page.update()
+
+    # Ajustes responsivos para dispositivos móveis
+    def responsive_layout():
+        # Verifique a largura da tela
+        if page.width < 600:  # Largura típica de dispositivos móveis
+            # Diminuir a largura dos campos de entrada em 10% para mobile
+            new_width = km_current_field.width * 0.9
+            km_next_field.width = new_width
+            km_current_field.width = new_width
+
+            # Centralizar os botões de enviar e cancelar para mobile
+            submit_button.width = 200  # Ajuste conforme necessário
+            cancel_button.width = 200  # Ajuste conforme necessário
+            submit_button.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+            cancel_button.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+        else:
+            # Para telas maiores, reverter para o tamanho original
+            km_current_field.width = 200
+            km_next_field.width = 250
+            submit_button.width = 150
+            cancel_button.width = 150
+            submit_button.horizontal_alignment = ft.CrossAxisAlignment.START
+            cancel_button.horizontal_alignment = ft.CrossAxisAlignment.START
+
+        page.update()
+
+    # Conecte o evento ao redimensionamento da tela
+    page.on_resized = lambda e: responsive_layout()  # Chama a função responsiva ao redimensionar
+
+    # Inicialize o layout responsivo
+    responsive_layout()
 
     # Adicionando data e hora no canto superior direito
     def update_time(e=None):
@@ -289,11 +373,11 @@ def main(page: ft.Page):
                 *create_checklist(),
                 ft.Text("Informe os KM para acompanhamento", size=15, weight=FontWeight.BOLD),
                 km_row,  # Linha com os campos KM
-                ft.Row(controls=[submit_button, cancel_button], spacing=10),  # Botões lado a lado
+                ft.Row(controls=[submit_button, cancel_button], spacing=10, alignment=ft.MainAxisAlignment.CENTER),  # Botões centralizados
             ],
             alignment=MainAxisAlignment.CENTER, horizontal_alignment=CrossAxisAlignment.CENTER,
         )
     )
 
 # Alteração: Permitir conexões externas com "host='0.0.0.0'"
-ft.app(target=main, host="0.0.0.0", port=8550)
+ft.app(target=main, view=WEB_BROWSER, port=8550)
